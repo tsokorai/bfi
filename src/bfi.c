@@ -33,15 +33,23 @@
 #include <stdlib.h>
 
 #include <fcntl.h>
+#include <sys/types.h>
+#ifndef __ATARI__
 #include <sys/errno.h>
 #include <sys/stat.h>
-#include <sys/types.h>
 #include <sys/uio.h>
 #include <termios.h>
+#else
+#include <unistd.h>
+#include <conio.h>
+#endif
 
-
+// FIXME: this is for non-XL systems, atarixl target could use stock 30000 byte heap...
+#ifdef __ATARI__
+#define DEFAULT_MEMSIZE 20000
+#else
 #define DEFAULT_MEMSIZE 30000
-
+#endif
 // FIXME: this should be moved to a separate module, or I could switch to C++
 
 /* Brainfuck VM */
@@ -181,36 +189,49 @@ void bfvm_run(bfvm_s *vm)
 }
 
 // FIXME: termios is antiquated and platform dependent...
+#ifndef __ATARI__
 static struct termios savedTerm;
+#endif
 
 void exit_handler()
 {
+#ifndef __ATARI__
 	/* reset terminal settings */
 	tcsetattr(0, TCSANOW, &savedTerm);
+#else
+        cgetc();
+#endif
 }
 
 int load_program(bfvm_s *vm, FILE *fp)
 {
-	void *progBuf = NULL;
+	unsigned char *progBuf = NULL;
 	size_t progSize = 0;
+#ifndef __ATARI__ 
 	struct stat fps;
-
+#endif
 	if (!fp || !vm) return 1;
 
+#ifndef __ATARI__
 	// st_size may be indeterminate (stdin), so don't count on fstat actually returning anything useful
 	int st = fstat(fileno(fp), &fps);
 	if (st == 0 && (fps.st_size > 0)) {
-		printf("stat size = %d\n", fps.st_size);
+		printf("stat size = %d\n", (int)fps.st_size);
 		
 		// TODO: mmap instead of reading explicitly
 		progSize = (size_t)fps.st_size;
+#else
+                fseek(fp, 0, SEEK_END);
+                progSize = (size_t)ftell(fp);
+                fseek(fp, 0, SEEK_SET);
+#endif
 		progBuf = calloc(1, progSize);
-		
 		if (fread(progBuf, progSize, 1, fp) != 1) {
 			fprintf(stderr, "Error reading from file\n");
 			free(progBuf);
 			return 1;
 		}
+#ifndef __ATARI__		
 	} else {
 		// pipe or stdin, read blocks of chars until we hit EOF
 		char buf[1024];
@@ -246,10 +267,10 @@ int load_program(bfvm_s *vm, FILE *fp)
 			progSize = offset; // trim any excess
 		}
 	}
-
+#endif
 	vm->sourcePool = progBuf;
 	vm->sourceSize = progSize;
-	printf("\nRead %d chars into program memory\n", progSize);
+	printf("\nRead %d chars into program memory\n", (int)progSize);
 
 	return 0;
 }
@@ -260,14 +281,16 @@ int load_program(bfvm_s *vm, FILE *fp)
  */
 int main(int argc, char **argv)
 {
+#ifndef __ATARI__    
 	struct termios newTerm;
+#endif
 	int rval = 0;
 	
 	// FIXME: Add options parsing using something getopt-ish
 	// FIXME: Allow specifying vm size and behavior
 	bfvm_s *vm = bfvm_alloc(DEFAULT_MEMSIZE);
 	if(argc >= 2 && !(argv[1][0] == '-' && argv[1][1] == '\0')) {
-		FILE *fp = fopen(argv[1], "r");
+		FILE *fp = fopen(argv[1], "rb");
 		if (fp) {
 			printf("Reading program from file %s\n", argv[1]);
 			rval = load_program(vm, fp);
@@ -281,14 +304,16 @@ int main(int argc, char **argv)
 	}
 
 	if (rval == 0) {
+            #ifndef __ATARI__
 		/* set term settings to unbuffered, no local echo and non-canonicalized input */
 		tcgetattr(0, &savedTerm);
-		atexit(exit_handler);
 		
 		tcgetattr(0, &newTerm);
 		newTerm.c_lflag &= ~(ECHO | ICANON);
 		tcsetattr(0, TCSANOW, &newTerm);
 		setvbuf(stdin, NULL, _IONBF, 0);
+            #endif
+		atexit(exit_handler);
 		
 		/* git'er done! */
 		bfvm_run(vm);

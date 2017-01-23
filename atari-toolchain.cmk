@@ -1,0 +1,19 @@
+CMAKE_MINIMUM_REQUIRED(VERSION 2.8)
+
+SET(CMAKE_SYSTEM_NAME Generic)
+
+# Change this to your cc65 location
+SET(TOOLCHAIN_LOC /home/tsokorai/d/cc65)
+
+set( CMAKE_C_COMPILER ${TOOLCHAIN_LOC}/bin/cl65 )
+set( CMAKE_C_COMPILER_ID cc65 )
+set( CMAKE_C_FLAGS "-t atari ")
+set( CMAKE_C_FLAGS_DEBUG "-t atari -g ")
+set( CMAKE_C_FLAGS_RELEASE "-t atari -Os ")
+set( CMAKE_C_COMPILER_ID_RUN TRUE )
+set( CMAKE_C_COMPILER_ID_WORKS TRUE )
+set( CMAKE_C_COMPILER_ID_FORCED TRUE )
+set( CMAKE_DEPFILE_FLAGS_C "--create-dep <DEPFILE>")
+set( CMAKE_C_VERBOSE_FLAG "-t atari -v" )
+set( CMAKE_C_FLAGS_DEBUG_INIT "-t atari -g" )
+set( CMAKE_EXECUTABLE_SUFFIX_C .com )
